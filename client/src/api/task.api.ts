@@ -15,8 +15,8 @@ export const getTasksAPI = async () => {
 };
 
 // Tạo task mới
-export const createTaskAPI = async (title: string) => {
-  const response = await axiosClient.post<Task>("/tasks", { title });
+export const createTaskAPI = async (data: { title: string; dueDate?: string }) => {
+  const response = await axiosClient.post<Task>("/tasks", data);
   return response.data;
 };
 
