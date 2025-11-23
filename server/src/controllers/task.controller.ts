@@ -19,10 +19,17 @@ export const createTask = async (req: AuthRequest, res: Response): Promise<any> 
   try {
     const { title, dueDate } = req.body;
     
+    // 1. Tìm task đang nằm trên cùng (có position bé nhất)
+    const firstTask = await Task.findOne({ user: req.user?.userId }).sort({ position: 1 });
+
+    // 2. Tính position mới: Nếu list rỗng thì lấy timestamp, nếu có task thì lấy (min - 1000)
+    // Lấy số to trừ đi để nó nhỏ hơn thằng đang đứng đầu
+    const newPosition = firstTask ? firstTask.position - 1000 : new Date().getTime(); 
+
     const newTask = new Task({
       title,
-      dueDate: dueDate || new Date(), // If no date is provided, use the current date
-      position: new Date().getTime(), // Use the current time as the default position
+      dueDate: dueDate || new Date(),
+      position: newPosition,
       user: req.user?.userId,
     });
 
