@@ -79,75 +79,69 @@ const DashboardPage = () => {
   const isDragEnabled = searchTerm === "" && filterStatus === "all";
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="max-w-[1400px] mx-auto">
+    <div className="min-h-screen p-3 md:p-8 selection:bg-indigo-100 selection:text-indigo-700 pb-20 md:pb-8"> {/* Giảm padding mobile, thêm padding bottom để không bị che bởi thanh điều hướng ảo của điện thoại */}
+      <div className="max-w-[1600px] mx-auto space-y-6 md:space-y-8"> 
         
-        {/* Header & Progress Bar */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">My Planner 📅</h1>
-          <button onClick={handleLogout} className="flex items-center gap-2 text-gray-600 hover:text-red-500 bg-white px-4 py-2 rounded-lg border shadow-sm"><LogOut size={18} /> <span className="hidden md:inline">Đăng xuất</span></button>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+          <div>
+              <h1 className="text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-purple-600 mb-1 md:mb-2">
+                My Planner
+              </h1>
+              <p className="text-slate-500 font-medium text-sm md:text-base">Quản lý công việc, kiến tạo tương lai ✨</p>
+          </div>
+          
+          {/* Nút logout nhỏ gọn hơn trên mobile */}
+          <button onClick={handleLogout} className="self-end md:self-auto flex items-center gap-2 text-slate-500 hover:text-red-500 bg-white/80 backdrop-blur-sm px-4 py-2 md:px-5 md:py-2.5 rounded-full shadow-sm hover:shadow-md transition-all border border-white text-sm md:text-base">
+            <LogOut size={16} className="md:w-[18px] md:h-[18px]" /> <span className="font-semibold">Thoát</span>
+          </button>
         </div>
+
         <ProgressBar total={tasks.length} completed={tasks.filter(t => t.isCompleted).length} />
 
-        {/* FORM ADD TASK (Giữ nguyên, chỉ thêm ref) */}
-        <form onSubmit={handleAddTask} className="mb-6 flex flex-col md:flex-row gap-3 bg-white p-4 rounded-xl shadow-sm border border-blue-100">
+        <form onSubmit={handleAddTask} className="flex flex-col md:flex-row gap-3 p-3 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 ring-4 ring-slate-50/50">
           <div className="relative flex-1">
              <input
               ref={titleInputRef}
               type="text"
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
-              placeholder="Thêm công việc mới..."
-              className="w-full p-3 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="✨ Thêm việc mới..."
+              className="w-full h-full px-4 py-3 md:px-6 md:py-4 bg-transparent text-base md:text-lg font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none"
               disabled={createTaskMutation.isPending}
             />
           </div>
-          <div className="relative">
+          <div className="flex justify-between md:justify-start items-center gap-2">
             <input 
               type="datetime-local" 
               value={newTaskDate}
               onChange={(e) => setNewTaskDate(e.target.value)}
-              className="w-full md:w-auto p-3 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-blue-500 outline-none text-gray-600 cursor-pointer"
+              className="flex-1 md:flex-none px-3 py-2 md:px-4 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-600 text-xs md:text-sm font-semibold cursor-pointer border-none focus:ring-0 transition-colors"
             />
+            <button type="submit" disabled={createTaskMutation.isPending || !newTaskTitle.trim()} className="w-10 h-10 md:w-12 md:h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-200 flex items-center justify-center transition-all active:scale-95 shrink-0">
+              {createTaskMutation.isPending ? <Loader2 className="animate-spin" /> : <Plus size={24} />}
+            </button>
           </div>
-          <button type="submit" disabled={createTaskMutation.isPending || !newTaskTitle.trim()} className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 transition-colors shadow-sm flex items-center justify-center min-w-[50px]">
-            {createTaskMutation.isPending ? <Loader2 className="animate-spin" /> : <Plus size={24} />}
-          </button>
         </form>
 
-        {/* TOOLBAR */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6 sticky top-2 z-10">
+        <div className="flex flex-col md:flex-row gap-3 sticky top-2 z-30 bg-white/80 backdrop-blur-xl p-2 rounded-2xl shadow-sm border border-white/50">
             <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input 
-                    type="text"
-                    placeholder="Tìm kiếm..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                        const value = e.target.value;
-                        setSearchTerm(value);
-                        
-                        if (value.trim().length > 0) {
-                            setViewMode("list");
-                        }
-                    }}
-                    className="w-full pl-10 pr-4 py-3 rounded-lg border-none shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                />
+                <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-indigo-400" size={18} />
+                <input type="text" placeholder="Tìm nhanh..." value={searchTerm} onChange={(e) => {setSearchTerm(e.target.value); if(e.target.value) setViewMode('list')}} className="w-full pl-10 md:pl-12 pr-4 py-2 md:py-2.5 bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white rounded-xl border-none focus:ring-2 focus:ring-indigo-100 transition-all font-medium text-slate-600 text-sm md:text-base" />
             </div>
-            <div className="flex gap-2">
-                <div className="flex bg-white p-1 rounded-lg shadow-sm">
+            
+            <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
+                <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
                     {(["all", "active", "completed"] as const).map((status) => (
-                        <button key={status} onClick={() => setFilterStatus(status)} className={clsx("px-3 py-2 rounded-md text-sm font-medium transition-all capitalize", filterStatus === status ? "bg-blue-100 text-blue-700 shadow-sm" : "text-gray-500 hover:bg-gray-50")}>{status === "all" ? "All" : status}</button>
+                        <button key={status} onClick={() => setFilterStatus(status)} className={clsx("px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-bold transition-all capitalize whitespace-nowrap", filterStatus === status ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600")}>{status === "all" ? "Tất cả" : status}</button>
                     ))}
                 </div>
-                <div className="flex bg-gray-200 p-1 rounded-lg shadow-inner">
-                   <button onClick={() => setViewMode("list")} className={clsx("p-2 rounded-md transition-all flex items-center gap-1 text-sm font-medium", viewMode === "list" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700")}><List size={18} /><span className="hidden sm:inline">List</span></button>
-                   <button onClick={() => setViewMode("week")} className={clsx("p-2 rounded-md transition-all flex items-center gap-1 text-sm font-medium", viewMode === "week" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700")}><CalendarDays size={18} /><span className="hidden sm:inline">Week</span></button>
+                <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
+                   <button onClick={() => setViewMode("list")} className={clsx("px-3 py-1.5 md:px-3 md:py-2 rounded-lg transition-all flex items-center gap-2 text-xs md:text-sm font-bold", viewMode === "list" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600")}><List size={16} /> List</button>
+                   <button onClick={() => setViewMode("week")} className={clsx("px-3 py-1.5 md:px-3 md:py-2 rounded-lg transition-all flex items-center gap-2 text-xs md:text-sm font-bold", viewMode === "week" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600")}><CalendarDays size={16} /> Week</button>
                 </div>
             </div>
         </div>
 
-        {/* RENDER VIEW */}
         {isLoading ? (
              <div className="text-center py-10 text-gray-500"><Loader2 className="animate-spin mx-auto mb-2"/> Đang tải...</div>
         ) : viewMode === "list" ? (

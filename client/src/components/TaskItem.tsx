@@ -10,43 +10,59 @@ interface TaskItemProps {
 }
 
 const TaskItem = ({ task, onToggle, onDelete }: TaskItemProps) => {
+  // Logic kiểm tra xem task đã quá hạn chưa
+  const isOverdue = !task.isCompleted && task.dueDate && new Date(task.dueDate) < new Date();
+
   return (
-    <div className="group flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all mb-3">
-      <div className="flex items-center gap-3 flex-1">
-        {/* Nút Checkbox */}
+    <div className={clsx(
+      "group relative flex items-center justify-between p-4 mb-3 transition-all duration-200 ease-in-out",
+      "bg-white rounded-2xl",
+      "shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]",
+      "border border-transparent hover:border-blue-100",
+      "transform hover:-translate-y-0.5"
+    )}>
+      
+      {/* Cạnh màu đánh dấu trạng thái (Trang trí) */}
+      <div className={clsx(
+        "absolute left-0 top-3 bottom-3 w-1 rounded-r-full transition-colors",
+        task.isCompleted ? "bg-green-400" : isOverdue ? "bg-red-400" : "bg-blue-400"
+      )} />
+
+      <div className="flex items-center gap-4 flex-1 pl-3">
+        {/* Custom Checkbox xịn hơn */}
         <button
-          // Chặn sự kiện kéo thả lan vào checkbox
-          onPointerDown={(e) => e.stopPropagation()} 
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={() => onToggle(task._id, !task.isCompleted)}
           className={clsx(
-            "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 cursor-pointer",
+            "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0",
             task.isCompleted
-              ? "bg-green-500 border-green-500"
-              : "border-gray-300 hover:border-green-500"
+              ? "bg-green-500 border-green-500 scale-105"
+              : "border-slate-300 hover:border-blue-400 bg-slate-50"
           )}
         >
-          {task.isCompleted && <Check size={14} className="text-white" />}
+          <Check size={14} className={clsx("text-white transition-transform", task.isCompleted ? "scale-100" : "scale-0")} />
         </button>
 
-        {/* Nội dung Task */}
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-1">
           <span
             className={clsx(
-              "text-gray-800 font-medium transition-all break-all",
-              task.isCompleted && "line-through text-gray-400"
+              "font-semibold text-slate-700 transition-all",
+              task.isCompleted && "line-through text-slate-400 decoration-slate-300"
             )}
           >
             {task.title}
           </span>
           
           {task.dueDate && (
-            <div className="flex items-center gap-3 mt-1">
-              <span className="text-xs text-gray-500 flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+            <div className="flex items-center gap-3 text-xs font-medium">
+              <span className={clsx("flex items-center gap-1.5 px-2 py-1 rounded-md", 
+                 isOverdue ? "bg-red-50 text-red-600" : "bg-slate-100 text-slate-500"
+              )}>
                 <Calendar size={12} />
-                {format(new Date(task.dueDate), "dd/MM/yyyy")}
+                {format(new Date(task.dueDate), "dd/MM")}
               </span>
               
-              <span className="text-xs text-blue-500 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded">
+              <span className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-100 text-slate-500">
                 <Clock size={12} />
                 {format(new Date(task.dueDate), "HH:mm")}
               </span>
@@ -55,17 +71,10 @@ const TaskItem = ({ task, onToggle, onDelete }: TaskItemProps) => {
         </div>
       </div>
 
-      {/* Nút xóa */}
       <button
-        // Giúp nút xóa hoạt động khi đang dùng dnd-kit, tránh tình trạng bị đè bởi dnd-kit
-        onPointerDown={(e) => e.stopPropagation()} 
-        onClick={() => {
-            if(window.confirm("Bạn có chắc muốn xóa task này không?")) {
-                onDelete(task._id);
-            }
-        }}
-        className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-2 cursor-pointer"
-        title="Xóa công việc"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => { if(window.confirm("Xóa nhé?")) onDelete(task._id); }}
+        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0"
       >
         <Trash2 size={18} />
       </button>
