@@ -1,20 +1,5 @@
-import {
-  DndContext,
-  closestCorners,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import {
   getTasksAPI,
   createTaskAPI,
@@ -22,106 +7,56 @@ import {
   deleteTaskAPI,
   type Task,
 } from "../api/task.api";
-import SortableTaskItem from "../components/SortableTaskItem";
-import TaskItem from "../components/TaskItem";
+import TaskListView from "../components/TaskListView";
+import WeeklyView from "../components/WeeklyView";
 import ProgressBar from "../components/ProgressBar";
-import { LogOut, Plus, Loader2, Search, Filter } from "lucide-react";
+import { LogOut, Plus, Loader2, Search, List, CalendarDays } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  // State UI
+  const [viewMode, setViewMode] = useState<"list" | "week">("list");
   
-  // State Input
+  const [currentDate, setCurrentDate] = useState(new Date());
+
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDate, setNewTaskDate] = useState("");
-  
-  // State Filter & Search
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "completed">("all");
 
-  const [localTasks, setLocalTasks] = useState<Task[]>([]);
+  // API & Mutations (Giữ nguyên)
+  const { data: tasks = [], isLoading } = useQuery({ queryKey: ["tasks"], queryFn: getTasksAPI });
 
-  // 1. Fetch API
-  const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ["tasks"],
-    queryFn: getTasksAPI,
-  });
-
-  useEffect(() => {
-    if (tasks.length > 0) {
-      setLocalTasks(tasks);
-    }
-  }, [tasks]);
-
-  // 2. Logic Lọc & Tìm kiếm (Xử lý ở Client cho nhanh)
-  const filteredTasks = useMemo(() => {
-    return localTasks.filter((task) => {
-      // Lọc theo Search
-      const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase());
-      // Lọc theo Trạng thái
-      const matchesFilter = 
-        filterStatus === "all" ? true :
-        filterStatus === "completed" ? task.isCompleted :
-        !task.isCompleted;
-
-      return matchesSearch && matchesFilter;
-    });
-  }, [localTasks, searchTerm, filterStatus]);
-
-  // Tính toán tiến độ
-  const totalTasks = localTasks.length;
-  const completedTasks = localTasks.filter(t => t.isCompleted).length;
-
-  // Setup Drag Sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
-
-  // Mutations
   const createTaskMutation = useMutation({
     mutationFn: (data: { title: string; dueDate?: string }) => createTaskAPI(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       setNewTaskTitle("");
-      setNewTaskDate("");
     },
   });
-
+  
   const updateTaskMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Task> }) => updateTaskAPI(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
   });
-
   const deleteTaskMutation = useMutation({
     mutationFn: deleteTaskAPI,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
   });
 
-  // Xử lý kéo thả (Chỉ chạy khi đang ở chế độ "All" và không tìm kiếm)
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = localTasks.findIndex((t) => t._id === active.id);
-    const newIndex = localTasks.findIndex((t) => t._id === over.id);
-    const newOrderedTasks = arrayMove(localTasks, oldIndex, newIndex);
-    
-    setLocalTasks(newOrderedTasks);
-
-    const prevTask = newOrderedTasks[newIndex - 1];
-    const nextTask = newOrderedTasks[newIndex + 1];
-    let newPosition;
-
-    if (!prevTask && !nextTask) newPosition = Date.now();
-    else if (!prevTask) newPosition = nextTask.position - 1000;
-    else if (!nextTask) newPosition = prevTask.position + 1000;
-    else newPosition = (prevTask.position + nextTask.position) / 2;
-
-    updateTaskMutation.mutate({ id: active.id as string, data: { position: newPosition } });
-  };
+  // Logic Filter
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesFilter = filterStatus === "all" ? true : filterStatus === "completed" ? task.isCompleted : !task.isCompleted;
+      return matchesSearch && matchesFilter;
+    });
+  }, [tasks, searchTerm, filterStatus]);
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,37 +64,41 @@ const DashboardPage = () => {
     createTaskMutation.mutate({ title: newTaskTitle, dueDate: newTaskDate || new Date().toISOString() });
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate("/login");
+  const handleQuickAdd = (dateStr: string) => {
+    const now = new Date();
+    const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    
+    setNewTaskDate(`${dateStr}T${timeString}`);
+    
+    titleInputRef.current?.focus();
+    
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Kiểm tra xem có được phép kéo thả không
+  const handleLogout = () => { localStorage.clear(); navigate("/login"); };
   const isDragEnabled = searchTerm === "" && filterStatus === "all";
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="max-w-3xl mx-auto">
-        {/* Header */}
+      <div className="max-w-[1400px] mx-auto">
+        
+        {/* Header & Progress Bar */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">My Tasks 🎯</h1>
-          <button onClick={handleLogout} className="flex items-center gap-2 text-gray-600 hover:text-red-500 bg-white px-4 py-2 rounded-lg border shadow-sm transition-all hover:shadow">
-            <LogOut size={18} /> <span className="hidden md:inline">Đăng xuất</span>
-          </button>
+          <h1 className="text-3xl font-bold text-gray-800">My Planner 📅</h1>
+          <button onClick={handleLogout} className="flex items-center gap-2 text-gray-600 hover:text-red-500 bg-white px-4 py-2 rounded-lg border shadow-sm"><LogOut size={18} /> <span className="hidden md:inline">Đăng xuất</span></button>
         </div>
+        <ProgressBar total={tasks.length} completed={tasks.filter(t => t.isCompleted).length} />
 
-        {/* Thanh Tiến Độ */}
-        <ProgressBar total={totalTasks} completed={completedTasks} />
-
-        {/* Form Tạo Task */}
-        <form onSubmit={handleAddTask} className="mb-6 flex flex-col md:flex-row gap-3">
+        {/* FORM ADD TASK (Giữ nguyên, chỉ thêm ref) */}
+        <form onSubmit={handleAddTask} className="mb-6 flex flex-col md:flex-row gap-3 bg-white p-4 rounded-xl shadow-sm border border-blue-100">
           <div className="relative flex-1">
              <input
+              ref={titleInputRef}
               type="text"
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
               placeholder="Thêm công việc mới..."
-              className="w-full p-4 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full p-3 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-blue-500 outline-none"
               disabled={createTaskMutation.isPending}
             />
           </div>
@@ -168,90 +107,66 @@ const DashboardPage = () => {
               type="datetime-local" 
               value={newTaskDate}
               onChange={(e) => setNewTaskDate(e.target.value)}
-              className="w-full md:w-auto p-4 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-gray-600 cursor-pointer"
+              className="w-full md:w-auto p-3 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-blue-500 outline-none text-gray-600 cursor-pointer"
             />
           </div>
-          <button
-            type="submit"
-            disabled={createTaskMutation.isPending || !newTaskTitle.trim()}
-            className="p-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-300 transition-colors shadow-sm flex items-center justify-center min-w-[60px]"
-          >
+          <button type="submit" disabled={createTaskMutation.isPending || !newTaskTitle.trim()} className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 transition-colors shadow-sm flex items-center justify-center min-w-[50px]">
             {createTaskMutation.isPending ? <Loader2 className="animate-spin" /> : <Plus size={24} />}
           </button>
         </form>
 
-        {/* Toolbar: Search & Filter */}
+        {/* TOOLBAR */}
         <div className="flex flex-col md:flex-row gap-4 mb-6 sticky top-2 z-10">
-            {/* Search Box */}
             <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input 
                     type="text"
-                    placeholder="Tìm kiếm công việc..."
+                    placeholder="Tìm kiếm..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                        const value = e.target.value;
+                        setSearchTerm(value);
+                        
+                        if (value.trim().length > 0) {
+                            setViewMode("list");
+                        }
+                    }}
                     className="w-full pl-10 pr-4 py-3 rounded-lg border-none shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 />
             </div>
-            
-            {/* Filter Tabs */}
-            <div className="flex bg-white p-1 rounded-lg shadow-sm">
-                {(["all", "active", "completed"] as const).map((status) => (
-                    <button
-                        key={status}
-                        onClick={() => setFilterStatus(status)}
-                        className={clsx(
-                            "px-4 py-2 rounded-md text-sm font-medium transition-all capitalize",
-                            filterStatus === status 
-                                ? "bg-blue-100 text-blue-700 shadow-sm" 
-                                : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                        )}
-                    >
-                        {status === "all" ? "Tất cả" : status === "active" ? "Đang làm" : "Đã xong"}
-                    </button>
-                ))}
+            <div className="flex gap-2">
+                <div className="flex bg-white p-1 rounded-lg shadow-sm">
+                    {(["all", "active", "completed"] as const).map((status) => (
+                        <button key={status} onClick={() => setFilterStatus(status)} className={clsx("px-3 py-2 rounded-md text-sm font-medium transition-all capitalize", filterStatus === status ? "bg-blue-100 text-blue-700 shadow-sm" : "text-gray-500 hover:bg-gray-50")}>{status === "all" ? "All" : status}</button>
+                    ))}
+                </div>
+                <div className="flex bg-gray-200 p-1 rounded-lg shadow-inner">
+                   <button onClick={() => setViewMode("list")} className={clsx("p-2 rounded-md transition-all flex items-center gap-1 text-sm font-medium", viewMode === "list" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700")}><List size={18} /><span className="hidden sm:inline">List</span></button>
+                   <button onClick={() => setViewMode("week")} className={clsx("p-2 rounded-md transition-all flex items-center gap-1 text-sm font-medium", viewMode === "week" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700")}><CalendarDays size={18} /><span className="hidden sm:inline">Week</span></button>
+                </div>
             </div>
         </div>
 
-        {/* Danh sách Task */}
-        <div className="space-y-2 pb-20">
-          {isLoading && localTasks.length === 0 ? (
-             <div className="text-center py-10 text-gray-500"><Loader2 className="animate-spin mx-auto mb-2"/> Đang tải dữ liệu...</div>
-          ) : (
-            <>
-                {isDragEnabled ? (
-                    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-                        <SortableContext items={filteredTasks.map(t => t._id)} strategy={verticalListSortingStrategy}>
-                            {filteredTasks.map((task) => (
-                                <SortableTaskItem
-                                    key={task._id}
-                                    task={task}
-                                    onToggle={(id, status) => updateTaskMutation.mutate({ id, data: { isCompleted: status } })}
-                                    onDelete={(id) => deleteTaskMutation.mutate(id)}
-                                />
-                            ))}
-                        </SortableContext>
-                    </DndContext>
-                ) : (
-                    filteredTasks.map((task) => (
-                        <TaskItem
-                            key={task._id}
-                            task={task}
-                            onToggle={(id, status) => updateTaskMutation.mutate({ id, data: { isCompleted: status } })}
-                            onDelete={(id) => deleteTaskMutation.mutate(id)}
-                        />
-                    ))
-                )}
-                
-                {filteredTasks.length === 0 && (
-                    <div className="text-center py-10 bg-white rounded-xl border border-dashed border-gray-300">
-                        <Filter className="mx-auto text-gray-300 mb-2" size={40} />
-                        <p className="text-gray-500">Không tìm thấy công việc nào phù hợp.</p>
-                    </div>
-                )}
-            </>
-          )}
-        </div>
+        {/* RENDER VIEW */}
+        {isLoading ? (
+             <div className="text-center py-10 text-gray-500"><Loader2 className="animate-spin mx-auto mb-2"/> Đang tải...</div>
+        ) : viewMode === "list" ? (
+             <TaskListView 
+                tasks={filteredTasks} 
+                isDragEnabled={isDragEnabled}
+                onUpdateTask={(id, data) => updateTaskMutation.mutate({ id, data })}
+                onDeleteTask={(id) => deleteTaskMutation.mutate(id)}
+             />
+        ) : (
+             <WeeklyView 
+                tasks={filteredTasks}
+                onUpdateTask={(id, data) => updateTaskMutation.mutate({ id, data })}
+                onDeleteTask={(id) => deleteTaskMutation.mutate(id)}
+                currentDate={currentDate}
+                onDateChange={setCurrentDate}
+                onQuickAdd={handleQuickAdd}
+             />
+        )}
       </div>
     </div>
   );
